@@ -1016,6 +1016,7 @@ class KubernetesNamespace:  # pylint: disable=too-many-public-methods
             self._api.context,
             self.name,
             f"pod/{pod.metadata.name}",
+            pod.metadata.name,
             remote_port,
             local_port,
             local_address,
