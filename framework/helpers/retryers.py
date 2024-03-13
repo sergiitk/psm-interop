@@ -263,7 +263,7 @@ class RetryError(tenacity.RetryError):
 
         if last_attempt.failed:
             err = last_attempt.exception()
-            self.message += f" Last exception: {type(err).__name__}: {err}"
+            self.message += f" Last Retry Attempt Error: {type(err).__name__}"
         elif check_result:
             self.message += " Check result callback returned False."
 
@@ -294,7 +294,7 @@ class RetryError(tenacity.RetryError):
     def reason_str(self):
         return self.exception_str() if self.exception() else self.result_str()
 
-    def with_cause_trace(self):
+    def set_with_cause_trace(self):
         self._print_cause_trace = True
 
     @classmethod
@@ -307,9 +307,12 @@ class RetryError(tenacity.RetryError):
 
     def __str__(self):
         result = self.message
-        if self._print_cause_trace and (cause := self.exception()):
-            cause_trace = framework.errors.format_error_with_trace(cause)
-            result += f"\nCaused by:\n{cause_trace}"
+        if cause := self.exception():
+            if self._print_cause_trace:
+                cause_trace = framework.errors.format_error_with_trace(cause)
+                result += f"\n\nLast Retry Attempt {cause_trace}"
+            else:
+                result += f" {cause}"
 
         if self.note:
             result += f"\n{self.note}"

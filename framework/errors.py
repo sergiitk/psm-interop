@@ -60,4 +60,13 @@ Reason: {reason}
 
 
 def format_error_with_trace(error: Exception) -> str:
+    """Returns formatted exception its stack trace."""
     return "".join(traceback.TracebackException.from_exception(error).format())
+
+
+def format_trace_only(error: Exception) -> str:
+    """Same as format_error_with_trace, but stack trace only."""
+    exception_tb = traceback.TracebackException.from_exception(error)
+    if not exception_tb.stack:
+        return ""
+    return "".join(exception_tb.stack.format())

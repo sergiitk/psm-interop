@@ -19,8 +19,7 @@ Gamma example:
     --server_xds_port=80 \
     --config_mesh=gketd-psm-grpc-server
 """
-
-
+import datetime
 import logging
 import signal
 
@@ -138,7 +137,7 @@ def main(argv):
 
     if _CMD.value == "run":
         logger.info("Run client, mode=%s", _MODE.value)
-        client_runner.run(
+        test_client = client_runner.run(
             server_target=server_target,
             qps=_QPS.value,
             print_response=_PRINT_RESPONSE.value,
@@ -146,6 +145,15 @@ def main(argv):
             config_mesh=_CONFIG_MESH.value,
             log_to_stdout=_FOLLOW.value,
         )
+        # try:
+        test_client.wait_for_active_xds_channel(
+            timeout=datetime.timedelta(seconds=5),
+            rpc_deadline=datetime.timedelta(seconds=5),
+        )
+        # except Exception as e:
+        #     logging.info("Caught")
+        #     print(str(e))
+        #     raise
         if should_follow_logs:
             print("Following pod logs. Press Ctrl+C top stop")
             signal.signal(signal.SIGINT, _make_sigint_handler(client_runner))

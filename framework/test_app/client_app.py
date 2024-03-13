@@ -154,12 +154,16 @@ class XdsTestClient(framework.rpc.grpc.GrpcApp):
                 rpc_deadline=rpc_deadline,
             )
         except retryers.RetryError as retry_err:
-            if isinstance(retry_err.exception(), self.ChannelNotFound):
+            cause = retry_err.exception()
+            if isinstance(cause, self.ChannelNotFound):
                 retry_err.add_note(
                     framework.errors.FrameworkError.note_blanket_error(
                         "The client couldn't connect to the server."
                     )
                 )
+            elif isinstance(cause, framework.rpc.grpc.RpcError):
+                # For rpc errors, print out the cause exception.
+                retry_err.set_with_cause_trace()
             raise
 
     def wait_for_active_xds_channel(
@@ -181,15 +185,16 @@ class XdsTestClient(framework.rpc.grpc.GrpcApp):
                 rpc_deadline=rpc_deadline,
             )
         except retryers.RetryError as retry_err:
-            if isinstance(retry_err.exception(), self.ChannelNotFound):
+            cause = retry_err.exception()
+            if isinstance(cause, self.ChannelNotFound):
                 retry_err.add_note(
                     framework.errors.FrameworkError.note_blanket_error(
                         "The client couldn't connect to the xDS control plane."
                     )
                 )
-            else:
-                # For other errors, print out the cause exception.
-                retry_err.with_cause_trace()
+            elif isinstance(cause, framework.rpc.grpc.RpcError):
+                # For rpc errors, print out the cause exception.
+                retry_err.set_with_cause_trace()
             raise
 
     def get_active_server_channel_socket(self) -> _ChannelzSocket:
