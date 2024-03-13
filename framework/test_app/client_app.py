@@ -187,6 +187,9 @@ class XdsTestClient(framework.rpc.grpc.GrpcApp):
                         "The client couldn't connect to the xDS control plane."
                     )
                 )
+            else:
+                # For other errors, print out the cause exception.
+                retry_err.with_cause_trace()
             raise
 
     def get_active_server_channel_socket(self) -> _ChannelzSocket:

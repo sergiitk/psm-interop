@@ -13,12 +13,13 @@
 # limitations under the License.
 """Base test case used for xds test suites."""
 import inspect
-import traceback
 from typing import Optional, Union
 import unittest
 
 from absl import logging
 from absl.testing import absltest
+
+import framework.errors
 
 
 class BaseTestCase(absltest.TestCase):
@@ -132,7 +133,7 @@ class BaseTestCase(absltest.TestCase):
     ) -> None:
         trace: str
         if isinstance(error, Exception):
-            trace = cls._format_error_with_trace(error)
+            trace = framework.errors.format_error_with_trace(error)
         else:
             trace = error
 
@@ -150,10 +151,4 @@ class BaseTestCase(absltest.TestCase):
                 "fail_type": fail_type,
                 "error": trace,
             },
-        )
-
-    @classmethod
-    def _format_error_with_trace(cls, error: Exception) -> str:
-        return "".join(
-            traceback.TracebackException.from_exception(error).format()
         )

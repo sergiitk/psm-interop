@@ -31,6 +31,8 @@ from tenacity import stop
 from tenacity import wait
 from tenacity.retry import retry_base
 
+import framework.errors
+
 retryers_logger = logging.getLogger(__name__)
 # Type aliases
 timedelta = datetime.timedelta
@@ -229,6 +231,7 @@ class RetryError(tenacity.RetryError):
 
     last_attempt: tenacity.Future
     note: str = ""
+    _print_cause_trace: bool = False
 
     def __init__(
         self,
@@ -291,6 +294,9 @@ class RetryError(tenacity.RetryError):
     def reason_str(self):
         return self.exception_str() if self.exception() else self.result_str()
 
+    def with_cause_trace(self):
+        self._print_cause_trace = True
+
     @classmethod
     def _exception_str(cls, err: Optional[BaseException]) -> str:
         return f"{type(err).__name__}: {err}" if err else "???"
@@ -300,4 +306,12 @@ class RetryError(tenacity.RetryError):
         self.note = note
 
     def __str__(self):
-        return self.message if not self.note else f"{self.message}\n{self.note}"
+        result = self.message
+        if self._print_cause_trace and (cause := self.exception()):
+            cause_trace = framework.errors.format_error_with_trace(cause)
+            result += f"\nCaused by:\n{cause_trace}"
+
+        if self.note:
+            result += f"\n{self.note}"
+
+        return result

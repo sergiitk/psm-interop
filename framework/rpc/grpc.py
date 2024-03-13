@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypeVar
 
 from google.protobuf import json_format
 import google.protobuf.message
@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 # Type aliases
 Message = google.protobuf.message.Message
 RpcError = grpc.RpcError
+
+# Response type variable - any instance of message.
+ResponseMessage = TypeVar("ResponseMessage", bound=Message)
 
 
 class GrpcClientHelper:
@@ -60,7 +63,7 @@ class GrpcClientHelper:
         req: Message,
         deadline_sec: Optional[int] = DEFAULT_RPC_DEADLINE_SEC,
         log_level: Optional[int] = logging.DEBUG,
-    ) -> Message:
+    ) -> ResponseMessage:
         if deadline_sec is None:
             deadline_sec = self.DEFAULT_RPC_DEADLINE_SEC
 
