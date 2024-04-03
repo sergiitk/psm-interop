@@ -22,7 +22,7 @@ import datetime as dt
 import functools
 import logging
 import pathlib
-from typing import List, Optional
+from typing import Final, List, Optional
 
 import absl.logging
 import mako.lookup
@@ -564,34 +564,23 @@ class KubernetesBaseRunner(base_runner.BaseRunner, metaclass=ABCMeta):
         # the rest of the _create_* methods, which pass kwargs as-is
         # to _create_from_template(), so that the kwargs dict is unpacked into
         # template variables and their values.
-        if "deployment_name" not in kwargs:
-            raise TypeError(
-                "Missing required keyword-only argument: deployment_name"
-            )
+        deployment_name: Final[str] = kwargs.get("deployment_name", None)
+        if not deployment_name:
+            raise TypeError("Keyword-only argument deployment_name is required")
 
         # Automatically apply random deployment_id to use in the matchLabels
         # to prevent selecting pods in the same namespace belonging to
         # a different deployment.
-        if "deployment_id" not in kwargs:
-            rand_id: str = framework.helpers.rand.rand_string(lowercase=True)
-            # Fun edge case: when rand_string() happen to generate numbers only,
-            # yaml interprets deployment_id label value as an integer,
-            # but k8s expects label values to be strings. Lol. K8s responds
-            # with a barely readable 400 Bad Request error: 'ReadString: expects
-            # \" or n, but found 9, error found in #10 byte of ...|ent_id'.
-            # Prepending deployment name forces deployment_id into a string,
-            # as well as it's just a better description.
-            self.deployment_id = f'{kwargs["deployment_name"]}-{rand_id}'
-            kwargs["deployment_id"] = self.deployment_id
-        else:
-            self.deployment_id = kwargs["deployment_id"]
+        if not kwargs.get("deployment_id", None):
+            kwargs["deployment_id"] = self.make_deployment_id(deployment_name)
+        self.deployment_id = kwargs["deployment_id"]
 
         deployment = self._create_from_template(template, **kwargs)
         if not isinstance(deployment, k8s.V1Deployment):
             raise _RunnerError(
                 f"Expected V1Deployment to be created from manifest {template}"
             )
-        if deployment.metadata.name != kwargs["deployment_name"]:
+        if deployment.metadata.name != deployment_name:
             raise _RunnerError(
                 "V1Deployment created with unexpected name: "
                 f"{deployment.metadata.name}"
@@ -1162,3 +1151,15 @@ class KubernetesBaseRunner(base_runner.BaseRunner, metaclass=ABCMeta):
         if resource_suffix:
             parts.append(resource_suffix)
         return "-".join(parts)
+
+    @classmethod
+    def make_deployment_id(cls, deployment_name: str):
+        rand_id: str = framework.helpers.rand.rand_string(lowercase=True)
+        # Fun edge case: when rand_string() happen to generate numbers only,
+        # yaml interprets deployment_id label value as an integer,
+        # but k8s expects label values to be strings. Lol. K8s responds
+        # with a barely readable 400 Bad Request error: 'ReadString: expects
+        # \" or n, but found 9, error found in #10 byte of ...|ent_id'.
+        # Prepending deployment name forces deployment_id into a string,
+        # as well as it's just a better description.
+        return f"{deployment_name}-{rand_id}"

@@ -15,7 +15,7 @@
 Run xDS Test Client on Kubernetes.
 """
 import logging
-from typing import Optional
+from typing import Final, Optional
 
 from framework.infrastructure import gcp
 from framework.infrastructure import k8s
@@ -153,10 +153,27 @@ class KubernetesClientRunner(k8s_base_runner.KubernetesBaseRunner):
                 gcp_service_account=self.gcp_service_account,
             )
 
+        # Generate deployment_id early to reference is other resources.
+        deployment_id: Final[str] = self.make_deployment_id(
+            self.deployment_name,
+        )
+
+        # Create a PodMonitoring resource if CSM Observability is enabled
+        # This is GMP (Google Managed Prometheus)
+        if enable_csm_observability:
+            self.pod_monitoring_name = f"{self.deployment_id}-gmp"
+            self.pod_monitoring = self._create_pod_monitoring(
+                "csm/pod-monitoring.yaml",
+                namespace_name=self.k8s_namespace.name,
+                deployment_id=deployment_id,
+                pod_monitoring_name=self.pod_monitoring_name,
+            )
+
         # Always create a new deployment
         self.deployment = self._create_deployment(
             self.deployment_template,
             deployment_name=self.deployment_name,
+            deployment_id=deployment_id,
             image_name=self.image_name,
             namespace_name=self.k8s_namespace.name,
             service_account_name=self.service_account_name,
@@ -178,17 +195,6 @@ class KubernetesClientRunner(k8s_base_runner.KubernetesBaseRunner):
             csm_workload_name=self.csm_workload_name,
             csm_canonical_service_name=self.csm_canonical_service_name,
         )
-
-        # Create a PodMonitoring resource if CSM Observability is enabled
-        # This is GMP (Google Managed Prometheus)
-        if enable_csm_observability:
-            self.pod_monitoring_name = f"{self.deployment_id}-gmp"
-            self.pod_monitoring = self._create_pod_monitoring(
-                "csm/pod-monitoring.yaml",
-                namespace_name=self.k8s_namespace.name,
-                deployment_id=self.deployment_id,
-                pod_monitoring_name=self.pod_monitoring_name,
-            )
 
         # We don't support for multiple client replicas at the moment.
         return self._make_clients_for_deployment(server_target=server_target)[0]
