@@ -22,11 +22,13 @@ readonly XDS_K8S_DRIVER_DIR="${SCRIPT_DIR}/.."
 cd "${XDS_K8S_DRIVER_DIR}"
 
 NO_SECURE="yes"
+DATE_FROM="2023-01-01T00:00:00+00:00"
 DATE_TO=$(date -Iseconds)
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --secure) NO_SECURE=""; shift ;;
+    --date_from=*) DATE_FROM="${1#*=}T00:00:00Z"; shift ;;
     --date_to=*) DATE_TO="${1#*=}T00:00:00Z"; shift ;;
     *) echo "Unknown argument $1"; exit 1 ;;
   esac
@@ -36,6 +38,7 @@ jq_selector=$(cat <<- 'EOM'
   .items[].metadata |
   select(
     (.name | test("-(client|server)-")) and
+    (.creationTimestamp >= $date_from) and
     (.creationTimestamp < $date_to)
   ) | .name
 EOM
@@ -45,7 +48,7 @@ mapfile -t namespaces < <(\
   kubectl get namespaces --sort-by='{.metadata.creationTimestamp}'\
                          --selector='owner=xds-k8s-interop-test'\
                           -o json\
-  | jq --arg date_to "${DATE_TO}" -r "${jq_selector}"
+  | jq --arg date_to "${DATE_TO}" --arg date_from "${DATE_FROM}" -r "${jq_selector}"
 )
   
 if [[ -z "${namespaces[*]}"  ]]; then
