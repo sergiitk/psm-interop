@@ -153,6 +153,8 @@ def make_server_runner(
         )
         server_runner = GammaServerRunner
 
+    namespace.wait_for_namespace_deleted_timeout_sec = 2 * 60
+
     return server_runner(namespace, **runner_kwargs)
 
 
