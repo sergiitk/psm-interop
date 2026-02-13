@@ -152,10 +152,33 @@ class XdsTestServer(framework.rpc.grpc.GrpcApp):
         """
         server = self.channelz.find_server_listening_on_port(self.rpc_port)
         if not server:
-            raise self.NotFound(
-                f"[{self.hostname}] Server"
-                f"listening on port {self.rpc_port} not found"
+            msg = (
+                f"[{self.hostname}] Server listening on port"
+                f" {self.rpc_port} not found"
             )
+            logger.error(msg)
+            try:
+                iter = self.channelz.list_servers(log_level=logging.INFO)
+                logger.info(
+                    "[%s] The list of channelz servers for debugging: %r",
+                    self.hostname,
+                    list(iter),
+                )
+            except Exception as err:
+                logger.warning(
+                    "[%s] Couldn't retrieve the list of channelz servers for "
+                    " debugging: %r",
+                    self.hostname,
+                    err,
+                )
+            raise self.NotFound(msg)
+
+        iter = self.channelz.list_servers(log_level=logging.INFO)
+        logger.info(
+            "[%s] The list of channelz servers for debugging: %r",
+            self.hostname,
+            list(iter),
+        )
         return server
 
     def get_test_server_sockets(self) -> Iterator[grpc_channelz.Socket]:

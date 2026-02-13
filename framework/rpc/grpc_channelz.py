@@ -158,6 +158,12 @@ class ChannelzServiceClient(framework.rpc.grpc.GrpcClientHelper):
                 listen_socket = self.get_socket(
                     listen_socket_ref.socket_id, **kwargs
                 )
+                logger.info(
+                    "Server %s socket %s: %r",
+                    server.ref.server_id,
+                    listen_socket_ref.socket_id,
+                    listen_socket,
+                )
                 listen_address: Address = listen_socket.local
                 if (
                     self.is_sock_tcpip_address(listen_address)
