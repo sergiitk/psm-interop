@@ -110,22 +110,25 @@ fetch_version_branches() {
   fi
 
   if [[ "${count}" -gt 0 ]]; then
-    # shellcheck disable=SC2016
-    raw_branches=$(gh api graphql -F owner="${owner}" -F name="${repo_name}" -f query='
-    query($owner: String!, $name: String!) {
-      repository(owner: $owner, name: $name) {
-        refs(refPrefix: "refs/heads/", query: "v1.", first: 100) {
-          nodes {
-            name
-            target {
-              ... on Commit {
-                oid
-              }
-            }
+    local gql_query
+    read -r -d '' gql_query << 'QUERY' || true
+query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    refs(refPrefix: "refs/heads/", query: "v1.", first: 100) {
+      nodes {
+        name
+        target {
+          ... on Commit {
+            oid
           }
         }
       }
-    }' --jq '.data.repository?.refs?.nodes[]? | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
+    }
+  }
+}
+QUERY
+    raw_branches=$(gh api graphql -F owner="${owner}" -F name="${repo_name}" -f query="${gql_query}" \
+      --jq '.data.repository?.refs?.nodes[]? | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
 
     if [[ -n "${raw_branches}" ]]; then
       printf '%s\n' "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
