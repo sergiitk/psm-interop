@@ -109,23 +109,27 @@ fetch_version_branches() {
     fi
   fi
 
-  raw_branches=$(gh api graphql -f query='
-  query {
-    repository(owner: "'"${owner}"'", name: "'"${repo_name}"'") {
-      refs(refPrefix: "refs/heads/", query: "v1.", first: 100) {
-        nodes {
-          name
-          target {
-            ... on Commit {
-              oid
+  if [[ "${count}" -gt 0 ]]; then
+    raw_branches=$(gh api graphql -f query='
+    query {
+      repository(owner: "'"${owner}"'", name: "'"${repo_name}"'") {
+        refs(refPrefix: "refs/heads/", query: "v1.", first: 100) {
+          nodes {
+            name
+            target {
+              ... on Commit {
+                oid
+              }
             }
           }
         }
       }
-    }
-  }' --jq '.data.repository.refs.nodes[] | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
+    }' --jq '.data.repository.refs.nodes[] | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
 
-  printf '%s\n' "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
+    if [[ -n "${raw_branches}" ]]; then
+      printf '%s\n' "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
+    fi
+  fi
 }
 
 #######################################
@@ -151,10 +155,10 @@ verify_image_tag() {
 
   # Use jq to extract status, actual SHAs, and all tags in a single pipe-separated line.
   result=$(printf '%s\n' "${tags_json}" | jq -r --arg branch "${branch}" --arg sha "${sha}" \
-    '.[] | select(.tags | index($branch) != null) | [
-      (.tags | index($sha) != null),
+    '.[] | select((.tags // []) | index($branch) != null) | [
+      ((.tags // []) | index($sha) != null),
       ([.tags[]? | select(test("^[0-9a-f]{40}$"))] | join(",")),
-      (.tags | join(","))
+      ((.tags // []) | join(","))
     ] | join("|")')
 
   if [[ -z "${result}" ]]; then
@@ -210,6 +214,11 @@ main() {
         ;;
     esac
   done
+
+  if [[ ! "${num_branches}" =~ ^[0-9]+$ ]]; then
+    echo "Error: --num-branches must be a non-negative integer, got '${num_branches}'" >&2
+    display_usage
+  fi
 
   if ! check_dependencies; then
     return 1
