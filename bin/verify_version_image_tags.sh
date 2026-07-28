@@ -103,7 +103,7 @@ fetch_version_branches() {
   IFS='/' read -r owner repo_name <<< "${repo}"
 
   if [[ "${include_master}" == "true" ]]; then
-    master_branch=$(gh api "repos/${repo}/branches/master" --jq '"master \(.commit.sha)"' || true)
+    master_branch=$(gh api "repos/${repo}/branches/master" --jq '"master \(.commit.sha)"')
     if [[ -n "${master_branch}" ]]; then
       echo "${master_branch}"
     fi
@@ -123,9 +123,9 @@ fetch_version_branches() {
         }
       }
     }
-  }' --jq '.data.repository.refs.nodes[] | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"' || true)
+  }' --jq '.data.repository.refs.nodes[] | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
 
-  echo "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
+  printf '%s\n' "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
 }
 
 #######################################
@@ -149,20 +149,20 @@ verify_image_tag() {
   local sha="$6"
   local result has_sha actual_shas all_tags
 
-  # Use jq to extract status, actual SHAs, and all tags in a single tab-separated line.
-  result=$(echo "${tags_json}" | jq -r --arg branch "${branch}" --arg sha "${sha}" \
-    '.[] | select(.tags[]? == $branch) | [
-      (.tags[]? == $sha),
+  # Use jq to extract status, actual SHAs, and all tags in a single pipe-separated line.
+  result=$(printf '%s\n' "${tags_json}" | jq -r --arg branch "${branch}" --arg sha "${sha}" \
+    '.[] | select(.tags | index($branch) != null) | [
+      (.tags | index($sha) != null),
       ([.tags[]? | select(test("^[0-9a-f]{40}$"))] | join(",")),
       (.tags | join(","))
-    ] | join("\t")' || true)
+    ] | join("|")')
 
   if [[ -z "${result}" ]]; then
     echo "❌ [FAIL] https://${registry}/${lang}-${role}:${branch} -> Branch tag missing"
     return 1
   fi
 
-  IFS=$'\t' read -r has_sha actual_shas all_tags <<< "${result}"
+  IFS='|' read -r has_sha actual_shas all_tags <<< "${result}"
 
   if [[ "${has_sha}" == "true" ]]; then
     echo "✅ [PASS] https://${registry}/${lang}-${role}:${branch} -> ${sha}"
@@ -234,7 +234,7 @@ main() {
   echo "======================================================================"
 
   for lang in "${lang_array[@]}"; do
-    lang=$(echo "${lang}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+    lang=$(printf '%s\n' "${lang}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
     repo=$(get_repo_for_lang "${lang}")
 
     if [[ -z "${repo}" ]]; then
@@ -242,7 +242,7 @@ main() {
       continue
     fi
 
-    printf "\n--- Language: %s (repo: %s) ---\n" "$(echo "${lang}" | tr '[:lower:]' '[:upper:]')" "${repo}"
+    printf "\n--- Language: %s (repo: %s) ---\n" "$(printf '%s\n' "${lang}" | tr '[:lower:]' '[:upper:]')" "${repo}"
 
     local cache_key="${repo}_${num_branches}_${include_master}"
     if [[ -z "${branch_cache[${cache_key}]:-}" ]]; then
@@ -257,8 +257,8 @@ main() {
     fi
 
     local client_tags_json server_tags_json
-    client_tags_json=$(gcloud container images list-tags "${registry}/${lang}-client" --format="json" || echo "[]")
-    server_tags_json=$(gcloud container images list-tags "${registry}/${lang}-server" --format="json" || echo "[]")
+    client_tags_json=$(gcloud container images list-tags "${registry}/${lang}-client" --format="json")
+    server_tags_json=$(gcloud container images list-tags "${registry}/${lang}-server" --format="json")
 
     local first_branch=true
     while read -r branch sha; do
