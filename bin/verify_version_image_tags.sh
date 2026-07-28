@@ -110,9 +110,10 @@ fetch_version_branches() {
   fi
 
   if [[ "${count}" -gt 0 ]]; then
-    raw_branches=$(gh api graphql -f query='
-    query {
-      repository(owner: "'"${owner}"'", name: "'"${repo_name}"'") {
+    # shellcheck disable=SC2016
+    raw_branches=$(gh api graphql -F owner="${owner}" -F name="${repo_name}" -f query='
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
         refs(refPrefix: "refs/heads/", query: "v1.", first: 100) {
           nodes {
             name
@@ -124,7 +125,7 @@ fetch_version_branches() {
           }
         }
       }
-    }' --jq '.data.repository.refs.nodes[] | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
+    }' --jq '.data.repository?.refs?.nodes[]? | select(.name | test("^v1\\.[0-9]+\\.[xX]$")) | "\(.name) \(.target.oid)"')
 
     if [[ -n "${raw_branches}" ]]; then
       printf '%s\n' "${raw_branches}" | sort -t. -k2,2nr | head -n "${count}"
@@ -189,16 +190,13 @@ main() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -n|--num-branches)
-        num_branches="$2"
-        shift 2
-        ;;
-      -r|--registry)
-        registry="$2"
-        shift 2
-        ;;
-      -l|--languages)
-        languages="$2"
+      -n|--num-branches|-r|--registry|-l|--languages)
+        [[ $# -ge 2 ]] || { echo "Error: Option $1 requires an argument." >&2; display_usage; }
+        case "$1" in
+          -n|--num-branches) num_branches="$2" ;;
+          -r|--registry)     registry="$2" ;;
+          -l|--languages)    languages="$2" ;;
+        esac
         shift 2
         ;;
       -m|--include-master)
