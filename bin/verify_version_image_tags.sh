@@ -155,12 +155,12 @@ verify_image_tag() {
   local result has_sha actual_shas all_tags
 
   # Use jq to extract status, actual SHAs, and all tags in a single pipe-separated line.
-  result=$(printf '%s\n' "${tags_json}" | jq -r --arg branch "${branch}" --arg sha "${sha}" \
+  result=$(jq -r --arg branch "${branch}" --arg sha "${sha}" \
     '.[] | select((.tags // []) | index($branch) != null) | [
       ((.tags // []) | index($sha) != null),
       ([.tags[]? | select(test("^[0-9a-f]{40}$"))] | join(",")),
       ((.tags // []) | join(","))
-    ] | join("|")')
+    ] | join("|")' <<< "${tags_json}")
 
   if [[ -z "${result}" ]]; then
     echo "❌ [FAIL] https://${registry}/${lang}-${role}:${branch} -> Branch tag missing"
@@ -264,8 +264,12 @@ main() {
     fi
 
     local client_tags_json server_tags_json
-    client_tags_json=$(gcloud container images list-tags "${registry}/${lang}-client" --format="json")
-    server_tags_json=$(gcloud container images list-tags "${registry}/${lang}-server" --format="json")
+    if ! client_tags_json=$(gcloud container images list-tags "${registry}/${lang}-client" --format="json" 2>/dev/null) || \
+       ! server_tags_json=$(gcloud container images list-tags "${registry}/${lang}-server" --format="json" 2>/dev/null); then
+      echo "❌ [FAIL] Failed to list image tags for ${registry}/${lang}. Ensure images exist and permissions are granted." >&2
+      overall_passed=false
+      continue
+    fi
 
     local first_branch=true
     while read -r branch sha; do
